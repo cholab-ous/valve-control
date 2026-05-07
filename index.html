@@ -54,6 +54,7 @@
         #saveConfigBtn { background-color: var(--cyan); color: white; border: none; }
         #loadConfigBtn { background-color: var(--yellow); color: #222; border: none; }
         #resetConfigBtn { background-color: var(--red); color: white; border: none; }
+        #downloadArduinoBtn { background-color: #343a40; color: white; border: none; }
         #addLabelBtn { background-color: var(--purple); color: white; border: none; }
         #renameLabelBtn { background-color: var(--blue); color: white; border: none; }
         #deleteLabelBtn { background-color: var(--red); color: white; border: none; }
@@ -597,6 +598,7 @@
                 <button id="saveConfigBtn">設定を保存</button>
                 <button id="loadConfigBtn">設定を読み込み</button>
                 <button id="resetConfigBtn">リセット</button>
+                <button id="downloadArduinoBtn">Arduinoコードを保存</button>
                 <input type="file" id="configFileInput" accept=".json,application/json" style="display: none;">
             </div>
 
@@ -2358,9 +2360,48 @@
             reader.readAsText(file);
         }
 
+
+
+        // --- Arduinoコード保存処理 ---
+        const ARDUINO_INO_CODE = "#include <BLEDevice.h>\n#include <BLEUtils.h>\n#include <BLEServer.h>\n#include <vector>\n\n// --- UUID設定 ---\n#define SERVICE_UUID        \"12345678-1234-5678-1234-56789abcdef0\"\n#define CHARACTERISTIC_UUID \"12345678-1234-5678-1234-56789abcdef1\"\n\n// --- ★変更点：バルブ接続ピン設定 (18本) ---\n// 安全に出力として使える18本のGPIOをフル活用しています\n// 割り当て: 2, 4, 5, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33\nconst int VALVE_PINS[18] = {2, 4, 5, 12, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33};\n\n// ★変更点：32ビットでデータを受け取る\nstd::vector<uint32_t> sequenceData;\nbool isSequenceReady = false;\n\nclass MyCallbacks: public BLECharacteristicCallbacks {\n    void onWrite(BLECharacteristic *pCharacteristic) {\n        std::string rxValue = pCharacteristic->getValue();\n\n        if (rxValue.length() > 0) {\n            sequenceData.clear();\n            \n            // ★変更点：Web側から送られてくる32ビット(4バイト)ずつ結合して元の数値に戻す\n            for (int i = 0; i < rxValue.length(); i += 4) {\n                if (i + 3 < rxValue.length()) {\n                    uint32_t val = (uint8_t)rxValue[i] | \n                                 ((uint32_t)(uint8_t)rxValue[i+1] << 8) | \n                                 ((uint32_t)(uint8_t)rxValue[i+2] << 16) | \n                                 ((uint32_t)(uint8_t)rxValue[i+3] << 24);\n                    sequenceData.push_back(val);\n                }\n            }\n            isSequenceReady = true;\n            Serial.println(\"データ受信完了。シーケンス待機中...\");\n        }\n    }\n};\n\nvoid setup() {\n    Serial.begin(115200);\n    Serial.println(\"起動中...\");\n\n    for (int i = 0; i < 18; i++) {\n        pinMode(VALVE_PINS[i], OUTPUT);\n        digitalWrite(VALVE_PINS[i], LOW);\n    }\n\n    BLEDevice::init(\"ESP32_Valve_Control\");\n    BLEDevice::setMTU(512); \n\n    BLEServer *pServer = BLEDevice::createServer();\n    BLEService *pService = pServer->createService(SERVICE_UUID);\n\n    BLECharacteristic *pCharacteristic = pService->createCharacteristic(\n        CHARACTERISTIC_UUID,\n        BLECharacteristic::PROPERTY_WRITE\n    );\n\n    pCharacteristic->setCallbacks(new MyCallbacks());\n    pService->start();\n\n    BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();\n    pAdvertising->addServiceUUID(SERVICE_UUID);\n    pAdvertising->setScanResponse(true);\n    pAdvertising->setMinPreferred(0x06);\n    pAdvertising->setMinPreferred(0x12);\n    BLEDevice::startAdvertising();\n\n    Serial.println(\"BLE待機中... Macから接続してください\");\n}\n\nvoid loop() {\n    if (isSequenceReady) {\n        isSequenceReady = false;\n        executeSequence();\n    }\n    delay(10);\n}\n\nvoid executeSequence() {\n    if (sequenceData.size() == 0) return;\n\n    // 変数も全て32ビット(uint32_t)に変更\n    uint32_t totalLoops = sequenceData[0];\n    \n    Serial.printf(\"=== シーケンス開始 (設定ループ回数: %d回) ===\\n\", totalLoops);\n\n    for (uint32_t currentLoop = 1; currentLoop <= totalLoops; currentLoop++) {\n        Serial.printf(\"--- 実行中: ループ %d / %d ---\\n\", currentLoop, totalLoops);\n\n        for (size_t i = 1; i < sequenceData.size(); i += 2) {\n            if (i + 1 >= sequenceData.size()) break; \n\n            uint32_t timeMs = sequenceData[i];\n            uint32_t valveState = sequenceData[i+1];\n\n            Serial.printf(\"ステップ %d: 時間 = %d ms, バルブ状態 = \", (i/2)+1, timeMs);\n            Serial.println(valveState, BIN);\n\n            // 18個のバルブ状態を反映\n            for (int v = 0; v < 18; v++) {\n                bool isOn = (valveState & (1 << v)) != 0;\n                digitalWrite(VALVE_PINS[v], isOn ? HIGH : LOW);\n            }\n\n            delay(timeMs);\n        }\n    }\n\n    Serial.println(\"=== シーケンス完全終了（全バルブOFF） ===\");\n    for (int i = 0; i < 18; i++) {\n        digitalWrite(VALVE_PINS[i], LOW);\n    }\n    delay(3000);\n}";
+
+        function downloadArduinoCode() {
+            const blob = new Blob([ARDUINO_INO_CODE], { type: 'text/x-arduino;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'valve_control_sequence.ino';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        async function saveArduinoCodeToSelectedFolder() {
+            if (!window.showDirectoryPicker) {
+                alert('この機能はChromeまたはEdgeの一部環境で使えます。使えない場合は「Arduinoコードを保存」でダウンロードしてください。');
+                return;
+            }
+
+            try {
+                const rootHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                const sketchFolder = await rootHandle.getDirectoryHandle('valve_control_sequence', { create: true });
+                const fileHandle = await sketchFolder.getFileHandle('valve_control_sequence.ino', { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(ARDUINO_INO_CODE);
+                await writable.close();
+                alert('valve_control_sequence/valve_control_sequence.ino として保存しました。Arduino IDEで開けます。');
+            } catch (error) {
+                if (error && error.name === 'AbortError') return;
+                console.error(error);
+                alert('Arduinoコードの保存に失敗しました。権限やブラウザを確認してください。');
+            }
+        }
+
         document.getElementById('saveConfigBtn').addEventListener('click', () => saveConfig());
         document.getElementById('loadConfigBtn').addEventListener('click', () => document.getElementById('configFileInput').click());
         document.getElementById('resetConfigBtn').addEventListener('click', () => resetExceptCountsAndLabels());
+        document.getElementById('downloadArduinoBtn').addEventListener('click', () => downloadArduinoCode());
         document.getElementById('configFileInput').addEventListener('change', (event) => {
             const file = event.target.files[0];
             if (file) loadConfigFromFile(file);
