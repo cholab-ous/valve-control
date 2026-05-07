@@ -1,0 +1,2458 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>バルブ制御システム - ステップ範囲スライダー補正版</title>
+    <style>
+        :root {
+            --bg: #f5f5f5;
+            --card: #ffffff;
+            --border: #d0d7de;
+            --muted: #6c757d;
+            --blue: #007bff;
+            --green: #28a745;
+            --red: #dc3545;
+            --orange: #fd7e14;
+            --purple: #6f42c1;
+            --cyan: #17a2b8;
+            --yellow: #ffc107;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            padding: 20px;
+            background-color: var(--bg);
+            color: #222;
+        }
+
+        .container {
+            background-color: var(--card);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+            overflow-x: auto;
+        }
+
+        h2, h3 { margin-top: 0; }
+        h3 { margin-bottom: 12px; }
+
+        button {
+            padding: 9px 16px;
+            margin: 6px 0;
+            cursor: pointer;
+            font-size: 15px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            background: #fff;
+        }
+
+        button:disabled { background-color: #ddd !important; color: #999 !important; cursor: not-allowed; }
+        #connectBtn { background-color: var(--blue); color: white; border: none; }
+        #sendBtn { background-color: var(--green); color: white; border: none; font-weight: bold; margin-top: 14px; }
+        #sendBtn:disabled { background-color: #aaa; cursor: not-allowed; }
+        #saveConfigBtn { background-color: var(--cyan); color: white; border: none; }
+        #loadConfigBtn { background-color: var(--yellow); color: #222; border: none; }
+        #resetConfigBtn { background-color: var(--red); color: white; border: none; }
+        #addLabelBtn { background-color: var(--purple); color: white; border: none; }
+        #renameLabelBtn { background-color: var(--blue); color: white; border: none; }
+        #deleteLabelBtn { background-color: var(--red); color: white; border: none; }
+        #finishLabelSelectionBtn { background-color: var(--green); color: white; border: none; }
+        #cancelLabelSelectionBtn { background-color: var(--muted); color: white; border: none; }
+        #applyLabelOnBtn { background-color: var(--green); color: white; border: none; }
+        #applyLabelOffBtn { background-color: var(--muted); color: white; border: none; }
+        #applyLabelToggleBtn { background-color: var(--orange); color: white; border: none; }
+
+        #status {
+            margin-left: 10px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .settings-panel, .label-panel {
+            background-color: #e9ecef;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+        }
+
+        .label-panel {
+            background-color: #f1f3f5;
+            border: 1px solid var(--border);
+        }
+
+        .counter-controls, .label-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn-circle {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            border-radius: 50%;
+            border: 1px solid #aaa;
+            background-color: #fff;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 18px;
+            margin: 0;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .btn-circle:hover { background-color: #ddd; }
+        .count-display { font-weight: bold; font-size: 18px; width: 34px; text-align: center; }
+        .setting-label { width: 220px; }
+        .small-label { font-weight: bold; }
+
+        input[type="checkbox"] { transform: scale(1.45); cursor: pointer; }
+        input[type="number"] { width: 70px; padding: 5px; text-align: center; }
+        input[type="text"], select {
+            padding: 6px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 13px;
+        }
+
+        .note {
+            font-size: 13px;
+            color: #555;
+            margin-top: 8px;
+            line-height: 1.5;
+        }
+
+        .label-chip-wrap {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 10px 0 12px;
+            min-height: 36px;
+            align-items: center;
+        }
+
+        .label-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid #aaa;
+            border-radius: 999px;
+            padding: 6px 11px;
+            font-size: 13px;
+            background: #fff;
+            cursor: pointer;
+            user-select: none;
+            line-height: 1;
+        }
+
+        .label-chip.selected {
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.22);
+            font-weight: 700;
+        }
+
+        .label-trash-zone {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 48px;
+            padding: 10px 14px;
+            margin: 10px 0 12px;
+            border: 2px dashed #dc3545;
+            border-radius: 12px;
+            background: #fff5f5;
+            color: #b02a37;
+            font-weight: 700;
+            transition: 0.15s ease;
+            user-select: none;
+        }
+
+        .label-trash-zone.drag-over {
+            background: #ffe3e3;
+            transform: scale(1.01);
+            box-shadow: 0 0 0 4px rgba(220, 53, 69, 0.15);
+        }
+
+        .label-chip.dragging {
+            opacity: 0.45;
+        }
+
+        .label-chip .label-delete-mini {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 1px solid rgba(0,0,0,0.2);
+            background: rgba(255,255,255,0.8);
+            font-size: 12px;
+            font-weight: 700;
+            margin-left: 2px;
+            cursor: pointer;
+        }
+
+        .label-chip .label-delete-mini:hover {
+            background: #fff;
+            color: var(--red);
+        }
+
+        .label-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            border: 1px solid rgba(0,0,0,0.15);
+        }
+
+        table {
+            border-collapse: collapse;
+            margin-top: 10px;
+            width: 100%;
+            min-width: 1100px;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .control-row { background-color: #e9ecef; }
+
+        .valve-row.dragging {
+            opacity: 0.45;
+            background: #fff3cd;
+        }
+
+        .valve-row.drag-over {
+            outline: 3px dashed var(--blue);
+            outline-offset: -3px;
+        }
+
+        .step-header {
+            cursor: grab;
+            user-select: none;
+            min-width: 78px;
+        }
+
+        .step-header.dragging {
+            opacity: 0.45;
+        }
+
+        .step-header.drag-over {
+            outline: 3px dashed var(--orange);
+            outline-offset: -3px;
+        }
+
+        .step-drag-handle {
+            display: inline-block;
+            margin-right: 4px;
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+        .step-position-note {
+            display: block;
+            font-size: 10px;
+            color: var(--muted);
+            font-weight: 400;
+            margin-top: 2px;
+        }
+
+        .valve-label-cell {
+            min-width: 230px;
+            text-align: left;
+            background: #fff;
+        }
+
+        .valve-label-box {
+            display: grid;
+            grid-template-columns: 30px 46px 1fr;
+            gap: 8px;
+            align-items: start;
+        }
+
+        .drag-handle {
+            width: 26px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            border: 1px solid #bbb;
+            background: #f8f9fa;
+            cursor: grab;
+            user-select: none;
+            color: #555;
+            font-weight: bold;
+        }
+
+        .drag-handle:active { cursor: grabbing; }
+
+        .select-handle {
+            width: 44px;
+            min-height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            border: 1px solid #b9a7e8;
+            background: #f5f0ff;
+            cursor: crosshair;
+            user-select: none;
+            color: #5a32a3;
+            font-weight: 700;
+            font-size: 12px;
+            line-height: 1;
+        }
+
+        .select-handle:active {
+            background: #e9ddff;
+        }
+
+        .valve-main { display: flex; flex-direction: column; gap: 5px; }
+        .pin-label { font-weight: bold; color: #333; }
+        .bit-note { font-size: 11px; color: #777; }
+        .custom-name-input { width: 150px; text-align: center; }
+
+
+        .custom-name-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            width: 100%;
+        }
+
+        .custom-name-row .custom-name-input {
+            flex: 1 1 auto;
+            min-width: 90px;
+        }
+
+        .inline-add-label-btn {
+            padding: 5px 8px;
+            margin: 0;
+            font-size: 12px;
+            border-radius: 999px;
+            border: 1px solid var(--purple);
+            background: var(--purple);
+            color: #fff;
+            white-space: nowrap;
+            display: none;
+        }
+
+        .inline-add-label-btn:disabled {
+            background: #c7b6dc;
+            border-color: #c7b6dc;
+            cursor: not-allowed;
+        }
+
+        .row-label-list {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            margin-top: 3px;
+        }
+
+        .row-label-chip {
+            font-size: 11px;
+            border-radius: 999px;
+            padding: 4px 7px;
+            border: 1px solid #aaa;
+            background: #fff;
+            color: #555;
+            cursor: pointer;
+            user-select: none;
+            line-height: 1;
+        }
+
+        .row-label-chip.active {
+            color: #111;
+            font-weight: 700;
+        }
+
+
+        .label-selection-status {
+            display: none;
+            padding: 10px 12px;
+            margin: 8px 0 12px;
+            border-radius: 8px;
+            background: #e7f5ff;
+            border: 1px solid #91d5ff;
+            color: #084298;
+            font-weight: 700;
+        }
+
+        .label-selection-status.active {
+            display: block;
+        }
+
+        .valve-row.label-select-mode-row {
+            cursor: crosshair;
+        }
+
+        .valve-row.label-select-mode-row:hover,
+        .valve-row.label-select-picked {
+            outline: 3px solid rgba(111, 66, 193, 0.55);
+            outline-offset: -3px;
+            background: #f5f0ff;
+        }
+
+        .label-drag-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3px 7px;
+            border-radius: 999px;
+            background: #6f42c1;
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+            visibility: hidden;
+            flex: 0 0 auto;
+            min-width: 82px;
+            box-sizing: border-box;
+        }
+
+        .valve-row.label-select-mode-row.label-select-active-row .label-drag-badge {
+            visibility: visible;
+        }
+
+        .step-range-input { display: none; }
+
+        .step-range-editor {
+            position: relative;
+            width: min(460px, 100%);
+            min-width: 300px;
+            height: 62px;
+            padding: 0 18px;
+            box-sizing: border-box;
+            user-select: none;
+            touch-action: none;
+        }
+
+        .step-range-track {
+            position: absolute;
+            left: 18px;
+            right: 18px;
+            top: 20px;
+            height: 6px;
+            border-radius: 999px;
+            background: #cfd4da;
+        }
+
+        .step-range-fill {
+            position: absolute;
+            top: 20px;
+            height: 6px;
+            border-radius: 999px;
+            background: rgba(0, 123, 255, 0.20);
+            border: 1px solid rgba(0, 123, 255, 0.60);
+            box-sizing: border-box;
+        }
+
+        .step-range-handle {
+            position: absolute;
+            top: 10px;
+            width: 22px;
+            height: 26px;
+            transform: translateX(-50%);
+            cursor: ew-resize;
+            z-index: 2;
+        }
+
+        .step-range-handle .handle-line {
+            position: absolute;
+            left: 50%;
+            top: 4px;
+            width: 2px;
+            height: 22px;
+            transform: translateX(-50%);
+            background: var(--blue);
+            border-radius: 999px;
+        }
+
+        .step-range-handle.start .handle-arrow {
+            position: absolute;
+            left: 1px;
+            top: 4px;
+            width: 0;
+            height: 0;
+            border-top: 8px solid transparent;
+            border-bottom: 8px solid transparent;
+            border-right: 11px solid var(--blue);
+        }
+
+        .step-range-handle.end .handle-arrow {
+            position: absolute;
+            right: 1px;
+            top: 4px;
+            width: 0;
+            height: 0;
+            border-top: 8px solid transparent;
+            border-bottom: 8px solid transparent;
+            border-left: 11px solid var(--blue);
+        }
+
+        .step-range-handle.dragging .handle-line,
+        .step-range-handle.dragging.start .handle-arrow,
+        .step-range-handle.dragging.end .handle-arrow {
+            filter: drop-shadow(0 0 3px rgba(0, 123, 255, 0.35));
+        }
+
+        .step-range-ticks {
+            position: absolute;
+            /* 数字の基準座標を矢印ハンドルと同じ editor 全体に合わせる。
+               以前はここにも left:18px が入っていたため、数字だけ18px右にずれていた。 */
+            left: 0;
+            right: 0;
+            top: 32px;
+            height: 22px;
+            pointer-events: none;
+        }
+
+        .step-range-tick {
+            position: absolute;
+            transform: translateX(-50%);
+            font-size: 11px;
+            color: #555;
+            white-space: nowrap;
+        }
+
+        .step-range-summary {
+            min-width: 96px;
+            padding: 7px 10px;
+            border-radius: 6px;
+            background: #fff;
+            border: 1px solid #d0d7de;
+            text-align: center;
+            font-weight: 700;
+            color: #1f4f91;
+        }
+
+        .label-chip .label-delete-mini {
+            appearance: none;
+            border: none;
+            background: rgba(255,255,255,0.75);
+            color: #b00020;
+            font-weight: bold;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            line-height: 16px;
+            padding: 0;
+            margin-left: 6px;
+            cursor: pointer;
+        }
+        .label-trash-zone { display: none !important; }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>バルブ制御システム</h2>
+
+        <div>
+            <button id="connectBtn">ESP32と接続する</button>
+            <span id="status">ステータス: 未接続</span>
+        </div>
+
+        <div class="settings-panel">
+            <div class="counter-controls">
+                <strong class="setting-label">バルブの数 (最大18): </strong>
+                <button class="btn-circle" id="btnValveMinus">-</button>
+                <span class="count-display" id="valveCountDisp">18</span>
+                <button class="btn-circle" id="btnValvePlus">+</button>
+            </div>
+
+            <div class="counter-controls">
+                <strong class="setting-label">ステップの数 (最大20): </strong>
+                <button class="btn-circle" id="btnStepMinus">-</button>
+                <span class="count-display" id="stepCountDisp">10</span>
+                <button class="btn-circle" id="btnStepPlus">+</button>
+            </div>
+
+            <div class="counter-controls" style="margin-top: 15px;">
+                <strong class="setting-label">全体のループ回数: </strong>
+                <input type="number" id="loopCount" value="1" min="1" max="999" style="width: 80px; font-size: 16px;"> 回
+            </div>
+
+            <div class="counter-controls" style="margin-top: 15px;">
+                <strong class="setting-label">設定ファイル: </strong>
+                <button id="saveConfigBtn">設定を保存</button>
+                <button id="loadConfigBtn">設定を読み込み</button>
+                <button id="resetConfigBtn">リセット</button>
+                <input type="file" id="configFileInput" accept=".json,application/json" style="display: none;">
+            </div>
+
+            <div class="note">
+                ※ 左端の「≡」をドラッグすると、バルブ行の表示順を変更できます。「選択」ボタンを押したまま上下になぞるとラベル作成用に選択できます。<br>
+                ※ ステップ見出しの「≡ S1」部分をドラッグすると、ステップ列の順番を変更できます。<br>
+                ※ バルブの表示順を変えてもBLE送信時のbit割り当てはPin番号基準なので、ESP32側の対応が崩れにくい仕様です。<br>
+                ※ ステップの表示順を変えた場合、BLE送信は画面に並んでいる左から右の順番で送信されます。<br>
+                ※ カスタム名、ラベル、バルブ表示順、ステップ表示順、時間、チェック状態、ループ回数はJSON設定ファイルとして保存・復元できます。<br>
+                ※ 「リセット」は、ステップ数・Pin数・作成済みラベル・Pinのカスタム名・ステップ範囲スライダーを残して、時間、チェック状態、並び順、ループ回数などを初期化します。
+            </div>
+        </div>
+
+        <div class="label-panel" id="labelPanel" style="display: none;">
+            <h3>グループラベル設定</h3>
+
+            <div class="label-controls">
+                <button id="startLabelSelectionBtn" style="display: none;">ラベル作成用にドラッグ選択</button>
+                <button id="addLabelBtn" disabled style="display: none;">ラベル追加</button>
+                <button id="finishLabelSelectionBtn" style="display: none;">選択完了</button>
+                <button id="cancelLabelSelectionBtn" style="display: none;">選択取消</button>
+            </div>
+
+            <div class="label-selection-status" id="labelSelectionStatus">
+                使い方：各バルブ行の「選択」ボタンを押したまま上下になぞって選択 → 選択したPinのカスタム名右側に出る「ラベル追加」 → ラベル名を入力。
+            </div>
+
+            <div class="label-chip-wrap" id="labelChipWrap"></div>
+
+            <div class="label-trash-zone" id="labelTrashZone" title="ラベルチップをここにドラッグ＆ドロップすると削除できます">
+                🗑️ ラベルをここにドラッグして削除
+            </div>
+
+            <div class="label-controls">
+                <span class="small-label">選択中ラベル:</span>
+                <select id="labelSelect" style="min-width: 220px;"></select>
+                <input type="text" id="selectedLabelName" placeholder="ラベル名を変更" style="width: 180px;">
+                <button id="renameLabelBtn">名称変更</button>
+                <button id="deleteLabelBtn">ラベル削除</button>
+            </div>
+
+            <div class="label-controls">
+                <span class="small-label">反映するステップ（表示順）:</span>
+                <div class="step-range-editor" id="stepRangeEditor">
+                    <div class="step-range-track"></div>
+                    <div class="step-range-fill" id="stepRangeFill"></div>
+                    <div class="step-range-handle start" id="stepRangeStartHandle" title="開始ステップ">
+                        <div class="handle-arrow"></div>
+                        <div class="handle-line"></div>
+                    </div>
+                    <div class="step-range-handle end" id="stepRangeEndHandle" title="終了ステップ">
+                        <div class="handle-arrow"></div>
+                        <div class="handle-line"></div>
+                    </div>
+                    <div class="step-range-ticks" id="stepRangeTicks"></div>
+                </div>
+                <div class="step-range-summary" id="stepRangeSummary">S1 ～ S10</div>
+                <input type="number" id="labelStepStart" class="step-range-input" value="1" min="1">
+                <input type="number" id="labelStepEnd" class="step-range-input" value="10" min="1">
+                <button id="applyLabelOnBtn">選択ラベルをON</button>
+                <button id="applyLabelOffBtn">選択ラベルをOFF</button>
+                <button id="applyLabelToggleBtn">選択ラベルを反転</button>
+            </div>
+
+            <div class="note">
+                使い方：追加したいバルブ行の「選択」ボタンを押したまま上下になぞる → 選択したPinのカスタム名右側に出る「ラベル追加」 → ラベル名を入力。<br>
+                既存のラベルは、各バルブ行の小さいラベルチップをクリックして付け外しできます。<br>
+                ラベル削除：選択中ラベルを「ラベル削除」で削除、またはラベル右端の「×」で削除できます。<br>
+                例：右前脚ラベルを Pin_2, Pin_4, Pin_5 に付けると、その3つをまとめてシーケンスに反映できます。
+            </div>
+        </div>
+
+        <table id="sequenceTable">
+            <thead>
+                <tr id="tableHeader"></tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+
+        <button id="sendBtn" disabled>シーケンスを送信 (Start)</button>
+    </div>
+
+    <script>
+        // --- 状態管理 ---
+        let currentSteps = 10;
+        const MAX_STEPS = 20;
+        const MIN_STEPS = 1;
+
+        // ステップ表示順。ドラッグ＆ドロップでこの配列を入れ替える。
+        // 画面上は左からこの順で表示され、BLE送信もこの表示順で送信される。
+        let stepOrder = Array.from({ length: MAX_STEPS }, (_, i) => i + 1);
+
+        // ESP32側のGPIOピン番号・標準bit割り当て順
+        const VALVE_PINS = [2, 4, 5, 12, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33];
+
+        let currentValves = 18;
+        const MAX_VALVES = VALVE_PINS.length;
+        const MIN_VALVES = 1;
+
+        // 表示順。ドラッグ＆ドロップでこの配列を入れ替える。
+        let valveOrder = [...VALVE_PINS];
+
+        // ラベル情報
+        const LABEL_COLORS = ['#dbeafe', '#dcfce7', '#fef3c7', '#fce7f3', '#ede9fe', '#cffafe', '#ffedd5', '#e5e7eb'];
+        let valveLabels = [];
+        let selectedLabelId = null;
+        let nextLabelId = 1;
+
+        let draggedPin = null;
+        let draggedStepKey = null;
+        let draggedLabelId = null;
+        let valveReorderActive = false;
+        let suppressLabelSelectionUntil = 0;
+
+        // ラベルの削除は、HTML5 drag/drop が環境によって不安定になる場合があるため、
+        // Pointer Events でも判定する。
+        let labelPointerDrag = {
+            active: false,
+            labelId: null,
+            chip: null,
+            startX: 0,
+            startY: 0,
+            moved: false
+        };
+        let suppressNextLabelClick = false;
+
+        // バルブ行をそのままドラッグでなぞって、ラベル作成用に一括選択するための状態
+        let labelSelectionMode = false;
+        let labelPaintActive = false;
+        let labelSelectionOriginalPins = null;
+        let labelSelectionDraftMode = false;
+        let draftLabelPins = [];
+        let labelSelectionStartPin = null;
+        let labelSelectionStartWasSelected = false;
+        let labelSelectionDragMoved = false;
+        // 「選択」ハンドルを押した時点で未選択なら追加モード、選択済みなら解除モード
+        let labelSelectionPaintAction = 'add';
+        let labelSelectionPointerStartX = 0;
+        let labelSelectionPointerStartY = 0;
+
+        function cancelActiveLabelPaint() {
+            labelPaintActive = false;
+            labelSelectionStartPin = null;
+            document.removeEventListener('pointermove', handleValveLabelSelectPointerMove);
+            document.removeEventListener('pointerup', handleValveLabelSelectPointerUp);
+        }
+
+        let activeStepRangeHandle = null;
+
+        function clampStepRangeValues(start, end) {
+            start = Number.isFinite(Number(start)) ? parseInt(start, 10) : 1;
+            end = Number.isFinite(Number(end)) ? parseInt(end, 10) : currentSteps;
+            start = Math.min(Math.max(start, 1), currentSteps);
+            end = Math.min(Math.max(end, 1), currentSteps);
+            if (start > end) [start, end] = [end, start];
+            return { start, end };
+        }
+
+        function setStepRange(start, end) {
+            const clamped = clampStepRangeValues(start, end);
+            document.getElementById('labelStepStart').value = clamped.start;
+            document.getElementById('labelStepEnd').value = clamped.end;
+            updateStepRangeUI();
+            return clamped;
+        }
+
+        function stepRangeStepToX(step, width, pad) {
+            // ステップ番号を「境界」ではなく「各ステップ枠の中央」に合わせる。
+            // これで S1 の矢印が 0 位置ではなく、S1 の中央に来る。
+            if (currentSteps <= 0) return pad;
+            return pad + ((step - 0.5) / currentSteps) * width;
+        }
+
+        function renderStepRangeTicks() {
+            const ticks = document.getElementById('stepRangeTicks');
+            const editor = document.getElementById('stepRangeEditor');
+            if (!ticks || !editor) return;
+            ticks.innerHTML = '';
+
+            const pad = 18;
+            const width = Math.max(editor.clientWidth - pad * 2, 1);
+            for (let step = 1; step <= currentSteps; step++) {
+                const tick = document.createElement('div');
+                tick.className = 'step-range-tick';
+                tick.textContent = step;
+                // 矢印ハンドルと同じ座標関数を使うため、数字と矢印が真上に揃う。
+                tick.style.left = `${stepRangeStepToX(step, width, pad)}px`;
+                ticks.appendChild(tick);
+            }
+        }
+
+        function updateStepRangeUI() {
+            const editor = document.getElementById('stepRangeEditor');
+            const fill = document.getElementById('stepRangeFill');
+            const startHandle = document.getElementById('stepRangeStartHandle');
+            const endHandle = document.getElementById('stepRangeEndHandle');
+            const summary = document.getElementById('stepRangeSummary');
+            if (!editor || !fill || !startHandle || !endHandle || !summary) return;
+
+            const { start, end } = clampStepRangeValues(document.getElementById('labelStepStart').value, document.getElementById('labelStepEnd').value);
+            document.getElementById('labelStepStart').value = start;
+            document.getElementById('labelStepEnd').value = end;
+
+            const pad = 18;
+            const width = Math.max(editor.clientWidth - pad * 2, 1);
+            const startX = stepRangeStepToX(start, width, pad);
+            const endX = stepRangeStepToX(end, width, pad);
+
+            startHandle.style.left = `${startX}px`;
+            endHandle.style.left = `${endX}px`;
+            fill.style.left = `${Math.min(startX, endX)}px`;
+            fill.style.width = `${Math.max(Math.abs(endX - startX), 4)}px`;
+            summary.textContent = start === end ? `S${start}` : `S${start} ～ S${end}`;
+
+            renderStepRangeTicks();
+        }
+
+        function getStepFromPointer(clientX) {
+            const editor = document.getElementById('stepRangeEditor');
+            const rect = editor.getBoundingClientRect();
+            const pad = 18;
+            const usableWidth = Math.max(rect.width - pad * 2, 1);
+            let localX = clientX - rect.left;
+            localX = Math.min(Math.max(localX, pad), rect.width - pad);
+            if (currentSteps <= 1) return 1;
+
+            // 矢印表示と同じく、各ステップ枠の中央基準で判定する。
+            // 例：左端から 0〜1ステップ幅の範囲は S1 として扱う。
+            const ratio = (localX - pad) / usableWidth;
+            return Math.min(currentSteps, Math.max(1, Math.floor(ratio * currentSteps) + 1));
+        }
+
+        function handleStepRangePointerMove(event) {
+            if (!activeStepRangeHandle) return;
+            event.preventDefault();
+            const start = parseInt(document.getElementById('labelStepStart').value, 10) || 1;
+            const end = parseInt(document.getElementById('labelStepEnd').value, 10) || currentSteps;
+            const step = getStepFromPointer(event.clientX);
+
+            if (activeStepRangeHandle === 'start') {
+                setStepRange(Math.min(step, end), end);
+            } else {
+                setStepRange(start, Math.max(step, start));
+            }
+        }
+
+        function handleStepRangePointerUp() {
+            document.removeEventListener('pointermove', handleStepRangePointerMove);
+            document.removeEventListener('pointerup', handleStepRangePointerUp);
+            document.removeEventListener('pointercancel', handleStepRangePointerUp);
+            document.getElementById('stepRangeStartHandle')?.classList.remove('dragging');
+            document.getElementById('stepRangeEndHandle')?.classList.remove('dragging');
+            activeStepRangeHandle = null;
+        }
+
+        function beginStepRangeDrag(which, event) {
+            if (event.button !== undefined && event.button !== 0) return;
+            event.preventDefault();
+            activeStepRangeHandle = which;
+            document.getElementById(which === 'start' ? 'stepRangeStartHandle' : 'stepRangeEndHandle')?.classList.add('dragging');
+            handleStepRangePointerMove(event);
+            document.addEventListener('pointermove', handleStepRangePointerMove, { passive: false });
+            document.addEventListener('pointerup', handleStepRangePointerUp, { passive: false });
+            document.addEventListener('pointercancel', handleStepRangePointerUp, { passive: false });
+        }
+
+        function initStepRangeEditor() {
+            const startHandle = document.getElementById('stepRangeStartHandle');
+            const endHandle = document.getElementById('stepRangeEndHandle');
+            if (startHandle && !startHandle.dataset.bound) {
+                startHandle.addEventListener('pointerdown', (event) => beginStepRangeDrag('start', event));
+                startHandle.dataset.bound = '1';
+            }
+            if (endHandle && !endHandle.dataset.bound) {
+                endHandle.addEventListener('pointerdown', (event) => beginStepRangeDrag('end', event));
+                endHandle.dataset.bound = '1';
+            }
+
+            window.addEventListener('resize', updateStepRangeUI);
+            setStepRange(document.getElementById('labelStepStart').value || 1, document.getElementById('labelStepEnd').value || currentSteps);
+        }
+
+        // Pin並べ替え操作とラベル選択が干渉しないように、
+        // ≡ を触った時点でラベル選択状態を完全に解除する。
+        function clearLabelDragVisualState() {
+            document.querySelectorAll('.valve-row.label-select-mode-row').forEach(row => {
+                row.classList.remove('label-select-mode-row', 'label-select-active-row');
+            });
+            labelPaintActive = false;
+            labelSelectionStartPin = null;
+            labelSelectionStartWasSelected = false;
+            labelSelectionDragMoved = false;
+            labelSelectionPaintAction = 'add';
+            document.removeEventListener('pointermove', handleValveLabelSelectPointerMove);
+            document.removeEventListener('pointerup', handleValveLabelSelectPointerUp);
+        }
+
+        function forceDisableLabelSelectionForReorder() {
+            // 並べ替え中は「ドラッグ選択中」表示と選択処理だけ止める。
+            // 作成途中のラベル選択結果は消さず、並べ替え後もラベル追加できるように残す。
+            clearLabelDragVisualState();
+            labelSelectionMode = !!(labelSelectionDraftMode && draftLabelPins.length > 0);
+            labelSelectionOriginalPins = null;
+        }
+
+        function suppressLabelSelectionFor(ms = 350) {
+            suppressLabelSelectionUntil = Date.now() + ms;
+        }
+
+        function isLabelSelectionSuppressed() {
+            return Date.now() < suppressLabelSelectionUntil || valveReorderActive;
+        }
+
+        function pinToBitIndex(pin) {
+            return VALVE_PINS.indexOf(Number(pin));
+        }
+
+        function getActivePins() {
+            return valveOrder.slice(0, currentValves);
+        }
+
+        function getActiveStepKeys() {
+            return stepOrder.slice(0, currentSteps);
+        }
+
+        function normalizeStepOrder() {
+            const valid = (Array.isArray(stepOrder) ? stepOrder : [])
+                .map(Number)
+                .filter(step => Number.isInteger(step) && step >= 1 && step <= MAX_STEPS)
+                .filter((step, pos, arr) => arr.indexOf(step) === pos);
+            const missing = Array.from({ length: MAX_STEPS }, (_, i) => i + 1).filter(step => !valid.includes(step));
+            stepOrder = [...valid, ...missing];
+        }
+
+        function getPinDisplayName(pin) {
+            const nameInput = document.getElementById(`name_pin${pin}`);
+            const customName = nameInput ? nameInput.value.trim() : '';
+            return customName ? `Pin_${pin} / ${customName}` : `Pin_${pin}`;
+        }
+
+        function getSelectedLabel() {
+            return valveLabels.find(label => String(label.id) === String(selectedLabelId)) || null;
+        }
+
+        function createDefaultLabels() {
+            if (valveLabels.length > 0) return;
+            valveLabels = [
+                { id: nextLabelId++, name: 'ラベル1', pins: [], color: LABEL_COLORS[0] }
+            ];
+            selectedLabelId = valveLabels[0].id;
+        }
+
+        function sanitizeLabels() {
+            const validPins = new Set(getActivePins());
+            valveLabels.forEach(label => {
+                label.pins = (label.pins || [])
+                    .map(Number)
+                    .filter(pin => validPins.has(pin))
+                    .filter((pin, pos, arr) => arr.indexOf(pin) === pos);
+                if (!label.color) label.color = LABEL_COLORS[0];
+            });
+            if (valveLabels.length === 0) {
+                selectedLabelId = null;
+                return;
+            }
+            if (!getSelectedLabel()) selectedLabelId = valveLabels[0].id;
+        }
+
+        function backupTableData() {
+            const backup = { checkbox: {}, number: {}, text: {} };
+            document.querySelectorAll('#sequenceTable input[type="checkbox"]').forEach(cb => backup.checkbox[cb.id] = cb.checked);
+            document.querySelectorAll('#sequenceTable input[type="number"]').forEach(num => backup.number[num.id] = num.value);
+            document.querySelectorAll('#sequenceTable input[type="text"]').forEach(text => backup.text[text.id] = text.value);
+            return backup;
+        }
+
+        function restoreTableData(backup) {
+            document.querySelectorAll('#sequenceTable input[type="checkbox"]').forEach(cb => {
+                if (backup.checkbox[cb.id] !== undefined) cb.checked = backup.checkbox[cb.id];
+            });
+            document.querySelectorAll('#sequenceTable input[type="number"]').forEach(num => {
+                if (backup.number[num.id] !== undefined) num.value = backup.number[num.id];
+            });
+            document.querySelectorAll('#sequenceTable input[type="text"]').forEach(text => {
+                if (backup.text[text.id] !== undefined) text.value = backup.text[text.id];
+            });
+        }
+
+        // --- テーブル描画処理 ---
+        function renderTable(providedBackup = null) {
+            const backup = providedBackup || backupTableData();
+
+            const tableHeader = document.getElementById('tableHeader');
+            const tbody = document.querySelector('#sequenceTable tbody');
+            normalizeStepOrder();
+            const activeStepKeys = getActiveStepKeys();
+
+            tableHeader.innerHTML = '<th>バルブ / ステップ</th>';
+            tbody.innerHTML = '';
+
+            activeStepKeys.forEach((stepKey, index) => {
+                const th = document.createElement('th');
+                th.className = 'step-header';
+                th.draggable = true;
+                th.dataset.stepKey = stepKey;
+                th.innerHTML = `<span class="step-drag-handle">≡</span>S${stepKey}<span class="step-position-note">表示${index + 1}</span>`;
+                th.title = 'ドラッグしてステップ列を並び替え';
+                th.addEventListener('dragstart', handleStepDragStart);
+                th.addEventListener('dragover', handleStepDragOver);
+                th.addEventListener('dragleave', handleStepDragLeave);
+                th.addEventListener('drop', handleStepDrop);
+                th.addEventListener('dragend', handleStepDragEnd);
+                tableHeader.appendChild(th);
+            });
+
+            const trEnable = document.createElement('tr');
+            trEnable.className = 'control-row';
+            trEnable.innerHTML = '<td><strong>有効 / 無効</strong></td>';
+            activeStepKeys.forEach(stepKey => {
+                const td = document.createElement('td');
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.id = `enable_s${stepKey}`;
+                cb.checked = true;
+                td.appendChild(cb);
+                trEnable.appendChild(td);
+            });
+            tbody.appendChild(trEnable);
+
+            const trTime = document.createElement('tr');
+            trTime.className = 'control-row';
+            trTime.innerHTML = '<td><strong>時間 (ミリ秒)</strong></td>';
+            activeStepKeys.forEach(stepKey => {
+                const td = document.createElement('td');
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.id = `time_s${stepKey}`;
+                input.value = 1000;
+                input.min = 0;
+                input.step = 100;
+                td.appendChild(input);
+                trTime.appendChild(td);
+            });
+            tbody.appendChild(trTime);
+
+            getActivePins().forEach(pin => {
+                const tr = document.createElement('tr');
+                tr.className = 'valve-row';
+                const selectionLabel = getSelectedLabel();
+                const isPickedForLabel = labelSelectionDraftMode
+                    ? draftLabelPins.includes(pin)
+                    : (selectionLabel && selectionLabel.pins.includes(pin));
+                if (labelSelectionMode && isPickedForLabel) {
+                    tr.classList.add('label-select-picked');
+                }
+                if (labelSelectionMode && labelPaintActive && !valveReorderActive && draggedStepKey === null) {
+                    tr.classList.add('label-select-mode-row', 'label-select-active-row');
+                }
+                tr.draggable = false;
+                tr.dataset.pin = pin;
+
+                // バルブ行の並び替えは「≡」専用、ラベル選択は「選択」専用に分ける
+                tr.addEventListener('dragstart', handleDragStart);
+                tr.addEventListener('dragover', handleDragOver);
+                tr.addEventListener('dragleave', handleDragLeave);
+                tr.addEventListener('drop', handleDrop);
+                tr.addEventListener('dragend', handleDragEnd);
+
+                const tdLabel = document.createElement('td');
+                tdLabel.className = 'valve-label-cell';
+                const bitIndex = pinToBitIndex(pin);
+
+                tdLabel.innerHTML = `
+                    <div class="valve-label-box">
+                        <span class="drag-handle" draggable="true" title="ドラッグしてPinを並び替え">≡</span>
+                        <span class="select-handle" title="押したまま上下になぞってラベル用に選択">選択</span>
+                        <div class="valve-main">
+                            <div><span class="pin-label">Pin_${pin}</span> <span class="bit-note">bit${bitIndex}</span></div>
+                            <div class="custom-name-row">
+                                <span class="label-drag-badge">ドラッグ選択中</span>
+                                <input
+                                    type="text"
+                                    id="name_pin${pin}"
+                                    class="custom-name-input"
+                                    placeholder="カスタム名"
+                                >
+                                <button
+                                    type="button"
+                                    class="inline-add-label-btn"
+                                    data-pin="${pin}"
+                                    title="選択中のPinでラベルを作成"
+                                >ラベル追加</button>
+                            </div>
+                            <div class="row-label-list" id="rowLabels_pin${pin}"></div>
+                        </div>
+                    </div>
+                `;
+
+                const dragHandle = tdLabel.querySelector('.drag-handle');
+                if (dragHandle) {
+                    // 「≡」はPin並べ替え専用。
+                    // capture=true で先に止めて、選択ボタン側・行側の処理へ絶対に流さない。
+                    const stopSelectionAndPrepareReorder = (event) => {
+                        suppressLabelSelectionFor(1500);
+                        forceDisableLabelSelectionForReorder();
+                        event.stopPropagation();
+                    };
+                    dragHandle.addEventListener('pointerdown', stopSelectionAndPrepareReorder, true);
+                    dragHandle.addEventListener('mousedown', stopSelectionAndPrepareReorder, true);
+                    dragHandle.addEventListener('touchstart', stopSelectionAndPrepareReorder, true);
+                    dragHandle.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }, true);
+                }
+
+                const selectHandle = tdLabel.querySelector('.select-handle');
+                if (selectHandle) {
+                    selectHandle.addEventListener('pointerdown', handleValveLabelSelectPointerDown);
+                    selectHandle.addEventListener('dragstart', (event) => event.preventDefault());
+                }
+
+                const inlineAddLabelBtn = tdLabel.querySelector('.inline-add-label-btn');
+                if (inlineAddLabelBtn) {
+                    inlineAddLabelBtn.addEventListener('pointerdown', (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    });
+                    inlineAddLabelBtn.addEventListener('mousedown', (event) => event.stopPropagation());
+                    inlineAddLabelBtn.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        addLabel();
+                    });
+                }
+
+                tr.appendChild(tdLabel);
+
+                activeStepKeys.forEach(stepKey => {
+                    const td = document.createElement('td');
+                    const cb = document.createElement('input');
+                    cb.type = 'checkbox';
+                    cb.id = `pin${pin}_s${stepKey}`;
+                    td.appendChild(cb);
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+
+            restoreTableData(backup);
+
+            document.getElementById('valveCountDisp').innerText = currentValves;
+            document.getElementById('stepCountDisp').innerText = currentSteps;
+            document.getElementById('labelStepStart').max = currentSteps;
+            document.getElementById('labelStepEnd').max = currentSteps;
+            setStepRange(document.getElementById('labelStepStart').value || 1, document.getElementById('labelStepEnd').value || currentSteps);
+
+            document.getElementById('btnValveMinus').disabled = currentValves <= MIN_VALVES;
+            document.getElementById('btnValvePlus').disabled = currentValves >= MAX_VALVES;
+            document.getElementById('btnStepMinus').disabled = currentSteps <= MIN_STEPS;
+            document.getElementById('btnStepPlus').disabled = currentSteps >= MAX_STEPS;
+
+            sanitizeLabels();
+            renderLabelControls();
+            renderRowLabelChips();
+        }
+
+        // --- ステップ列ドラッグ＆ドロップ処理 ---
+        function handleStepDragStart(event) {
+            // ステップ並べ替え中は、ラベル用ドラッグ選択と表示が干渉しないように止める。
+            clearLabelDragVisualState();
+            suppressLabelSelectionFor(1500);
+            draggedStepKey = Number(event.currentTarget.dataset.stepKey);
+            event.currentTarget.classList.add('dragging');
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', `step:${draggedStepKey}`);
+        }
+
+        function handleStepDragOver(event) {
+            event.preventDefault();
+            if (Number(event.currentTarget.dataset.stepKey) !== draggedStepKey) {
+                event.currentTarget.classList.add('drag-over');
+            }
+        }
+
+        function handleStepDragLeave(event) {
+            event.currentTarget.classList.remove('drag-over');
+        }
+
+        function handleStepDrop(event) {
+            event.preventDefault();
+            const targetStepKey = Number(event.currentTarget.dataset.stepKey);
+            event.currentTarget.classList.remove('drag-over');
+            if (!draggedStepKey || draggedStepKey === targetStepKey) return;
+
+            const backup = backupTableData();
+            const fromIndex = stepOrder.indexOf(draggedStepKey);
+            const toIndex = stepOrder.indexOf(targetStepKey);
+            if (fromIndex < 0 || toIndex < 0) return;
+
+            // 挿入ではなく「交換」にする。
+            // 例: 1 2 3 4 5 の状態で S1 を S5 に重ねると、5 2 3 4 1 になる。
+            [stepOrder[fromIndex], stepOrder[toIndex]] = [stepOrder[toIndex], stepOrder[fromIndex]];
+            clearLabelDragVisualState();
+            renderTable(backup);
+        }
+
+        function handleStepDragEnd(event) {
+            event.currentTarget.classList.remove('dragging');
+            document.querySelectorAll('.step-header.drag-over').forEach(header => header.classList.remove('drag-over'));
+            draggedStepKey = null;
+            clearLabelDragVisualState();
+            suppressLabelSelectionFor(800);
+        }
+
+        // --- バルブ行ドラッグ＆ドロップ処理 ---
+        function handleDragStart(event) {
+            // バルブ行の入れ替えは左端の「≡」から始めたときだけにする。
+            const handle = event.target.closest('.drag-handle');
+            if (!handle) {
+                event.preventDefault();
+                return;
+            }
+            cancelActiveLabelPaint();
+            suppressLabelSelectionFor(1500);
+            forceDisableLabelSelectionForReorder();
+            valveReorderActive = true;
+
+            const row = event.currentTarget;
+            draggedPin = Number(row.dataset.pin);
+            row.classList.add('dragging');
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', String(draggedPin));
+        }
+
+        function handleDragOver(event) {
+            if (!valveReorderActive || draggedPin === null) return;
+            event.preventDefault();
+
+            const currentRow = event.currentTarget;
+            const currentPin = Number(currentRow.dataset.pin);
+
+            // tr内のtd/inputをまたぐたびに dragleave が発生して枠線がチカチカするのを防ぐため、
+            // dragleaveでは消さず、dragover中の行だけをここで安定して更新する。
+            document.querySelectorAll('.valve-row.drag-over').forEach(row => {
+                if (row !== currentRow) row.classList.remove('drag-over');
+            });
+
+            if (currentPin !== draggedPin) {
+                currentRow.classList.add('drag-over');
+            }
+        }
+
+        function handleDragLeave(event) {
+            // 枠線のチカチカ防止のため、ここでは消さない。
+            // drop / dragend / 次のdragoverでまとめて整理する。
+        }
+
+        function handleDrop(event) {
+            if (!valveReorderActive || draggedPin === null) return;
+            event.preventDefault();
+            const targetPin = Number(event.currentTarget.dataset.pin);
+            event.currentTarget.classList.remove('drag-over');
+            if (!draggedPin || draggedPin === targetPin) return;
+
+            const backup = backupTableData();
+            const fromIndex = valveOrder.indexOf(draggedPin);
+            const toIndex = valveOrder.indexOf(targetPin);
+            if (fromIndex < 0 || toIndex < 0) return;
+
+            // 挿入ではなく「交換」にする。
+            // 例: Pin_2 を Pin_14 に重ねると、2番目以降が詰まるのではなく2つの位置だけ入れ替わる。
+            [valveOrder[fromIndex], valveOrder[toIndex]] = [valveOrder[toIndex], valveOrder[fromIndex]];
+            clearLabelDragVisualState();
+            renderTable(backup);
+        }
+
+        function handleDragEnd(event) {
+            event.currentTarget.classList.remove('dragging');
+            document.querySelectorAll('.valve-row.drag-over').forEach(row => row.classList.remove('drag-over'));
+            draggedPin = null;
+            valveReorderActive = false;
+            clearLabelDragVisualState();
+            suppressLabelSelectionFor(800);
+        }
+
+        // --- ラベルUI ---
+        function renderLabelControls() {
+            const labelSelect = document.getElementById('labelSelect');
+            const selectedLabelName = document.getElementById('selectedLabelName');
+            const labelChipWrap = document.getElementById('labelChipWrap');
+            const finishBtn = document.getElementById('finishLabelSelectionBtn');
+            const cancelBtn = document.getElementById('cancelLabelSelectionBtn');
+            const status = document.getElementById('labelSelectionStatus');
+            const addBtn = document.getElementById('addLabelBtn');
+
+            labelSelect.innerHTML = '';
+            labelChipWrap.innerHTML = '';
+
+            valveLabels.forEach(label => {
+                const option = document.createElement('option');
+                option.value = label.id;
+                option.textContent = `${label.name} (${label.pins.length})`;
+                if (String(label.id) === String(selectedLabelId)) option.selected = true;
+                labelSelect.appendChild(option);
+
+                const chip = document.createElement('span');
+                chip.className = 'label-chip';
+                chip.draggable = false;
+                chip.dataset.labelId = label.id;
+                chip.title = 'クリックで選択 / 右端の×で削除';
+                if (String(label.id) === String(selectedLabelId)) chip.classList.add('selected');
+                chip.style.background = label.color || '#fff';
+                chip.innerHTML = `<span class="label-dot" style="background:${label.color || '#fff'}"></span>${escapeHtml(label.name)} <small>${label.pins.length}</small><span class="label-delete-mini" title="このラベルを削除">×</span>`;
+
+                const miniDeleteBtn = chip.querySelector('.label-delete-mini');
+                if (miniDeleteBtn) {
+                    miniDeleteBtn.addEventListener('pointerdown', (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    });
+                    miniDeleteBtn.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        deleteLabelById(label.id, true);
+                    });
+                }
+
+                chip.addEventListener('click', (event) => {
+                    if (suppressNextLabelClick) {
+                        suppressNextLabelClick = false;
+                        return;
+                    }
+                    if (event.target.classList.contains('label-delete-mini')) {
+                        event.stopPropagation();
+                        deleteLabelById(label.id, true);
+                        return;
+                    }
+                    selectedLabelId = label.id;
+                    renderLabelControls();
+                    renderRowLabelChips();
+                });
+
+                chip.addEventListener('pointerdown', (event) => handleLabelPointerDown(event, label.id, chip));
+                labelChipWrap.appendChild(chip);
+            });
+
+            const label = getSelectedLabel();
+            selectedLabelName.value = label ? label.name : '';
+            selectedLabelName.disabled = !label;
+            labelSelect.disabled = valveLabels.length === 0;
+            document.getElementById('renameLabelBtn').disabled = !label;
+            document.getElementById('deleteLabelBtn').disabled = !label;
+            document.getElementById('applyLabelOnBtn').disabled = !label;
+            document.getElementById('applyLabelOffBtn').disabled = !label;
+            document.getElementById('applyLabelToggleBtn').disabled = !label;
+
+            if (finishBtn) finishBtn.style.display = 'none';
+            if (cancelBtn) cancelBtn.style.display = labelSelectionDraftMode ? 'inline-block' : 'none';
+            if (addBtn) addBtn.disabled = !labelSelectionDraftMode || draftLabelPins.length === 0;
+            if (status) {
+                status.classList.toggle('active', labelSelectionMode);
+                if (labelSelectionMode && label) {
+                    status.textContent = `ラベル選択モード中：「${label.name}」に入れたいバルブ行をドラッグでなぞってください。現在 ${label.pins.length} 個選択中です。`;
+                }
+            }
+        }
+
+        function isPointerInsideTrash(event) {
+            const trash = document.getElementById('labelTrashZone');
+            if (!trash) return false;
+            const rect = trash.getBoundingClientRect();
+            return (
+                event.clientX >= rect.left &&
+                event.clientX <= rect.right &&
+                event.clientY >= rect.top &&
+                event.clientY <= rect.bottom
+            );
+        }
+
+        function handleLabelPointerDown(event, labelId, chip) {
+            // ×ボタン押下時は削除ボタン側に任せる
+            if (event.target.classList.contains('label-delete-mini')) return;
+            if (event.button !== undefined && event.button !== 0) return;
+
+            labelPointerDrag = {
+                active: true,
+                labelId,
+                chip,
+                startX: event.clientX,
+                startY: event.clientY,
+                moved: false
+            };
+
+            document.addEventListener('pointermove', handleLabelPointerMove);
+            document.addEventListener('pointerup', handleLabelPointerUp, { once: true });
+        }
+
+        function handleLabelPointerMove(event) {
+            if (!labelPointerDrag.active) return;
+
+            const dx = event.clientX - labelPointerDrag.startX;
+            const dy = event.clientY - labelPointerDrag.startY;
+            if (Math.hypot(dx, dy) > 6) {
+                labelPointerDrag.moved = true;
+                draggedLabelId = labelPointerDrag.labelId;
+                if (labelPointerDrag.chip) labelPointerDrag.chip.classList.add('dragging');
+                suppressNextLabelClick = true;
+            }
+
+            const trash = document.getElementById('labelTrashZone');
+            if (trash) {
+                trash.classList.toggle('drag-over', labelPointerDrag.moved && isPointerInsideTrash(event));
+            }
+        }
+
+        function handleLabelPointerUp(event) {
+            document.removeEventListener('pointermove', handleLabelPointerMove);
+
+            const trash = document.getElementById('labelTrashZone');
+            if (trash) trash.classList.remove('drag-over');
+
+            if (labelPointerDrag.active && labelPointerDrag.moved) {
+                suppressNextLabelClick = true;
+                if (isPointerInsideTrash(event)) {
+                    deleteLabelById(labelPointerDrag.labelId, true);
+                }
+            }
+
+            if (labelPointerDrag.chip) labelPointerDrag.chip.classList.remove('dragging');
+            labelPointerDrag = { active: false, labelId: null, chip: null, startX: 0, startY: 0, moved: false };
+
+            setTimeout(() => {
+                draggedLabelId = null;
+                suppressNextLabelClick = false;
+            }, 150);
+        }
+
+        function handleLabelDragStart(event) {
+            draggedLabelId = Number(event.currentTarget.dataset.labelId);
+            event.currentTarget.classList.add('dragging');
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', `label:${draggedLabelId}`);
+        }
+
+        function handleLabelDragEnd(event) {
+            event.currentTarget.classList.remove('dragging');
+            const trash = document.getElementById('labelTrashZone');
+            if (trash) trash.classList.remove('drag-over');
+            draggedLabelId = null;
+        }
+
+        function deleteLabelById(labelId, requireConfirm = true) {
+            const label = valveLabels.find(l => String(l.id) === String(labelId));
+            if (!label) return;
+
+            if (requireConfirm && !confirm(`「${label.name}」を削除しますか？`)) return;
+
+            if (String(selectedLabelId) === String(labelId)) {
+                stopLabelSelection(false);
+            }
+            valveLabels = valveLabels.filter(l => String(l.id) !== String(labelId));
+            selectedLabelId = valveLabels.length ? valveLabels[0].id : null;
+            renderTable(backupTableData());
+        }
+
+        function setupLabelTrashZone() {
+            const trash = document.getElementById('labelTrashZone');
+            if (!trash) return;
+
+            trash.addEventListener('dragover', (event) => {
+                // dragover中はブラウザによって getData が空になるため、
+                // ラベルをつかんでいる状態なら必ず受け入れる。
+                if (draggedLabelId !== null) {
+                    event.preventDefault();
+                    trash.classList.add('drag-over');
+                    event.dataTransfer.dropEffect = 'move';
+                }
+            });
+
+            trash.addEventListener('dragleave', () => {
+                trash.classList.remove('drag-over');
+            });
+
+            trash.addEventListener('drop', (event) => {
+                event.preventDefault();
+                trash.classList.remove('drag-over');
+
+                const data = event.dataTransfer.getData('text/plain') || '';
+                let labelId = draggedLabelId;
+                if (data.startsWith('label:')) {
+                    labelId = Number(data.replace('label:', ''));
+                }
+                if (labelId === null || labelId === undefined || Number.isNaN(Number(labelId))) return;
+
+                deleteLabelById(Number(labelId), true);
+            });
+        }
+
+        function renderRowLabelChips() {
+            getActivePins().forEach(pin => {
+                const box = document.getElementById(`rowLabels_pin${pin}`);
+                if (!box) return;
+                box.innerHTML = '';
+
+                valveLabels.forEach(label => {
+                    const chip = document.createElement('span');
+                    const active = label.pins.includes(pin);
+                    chip.className = `row-label-chip${active ? ' active' : ''}`;
+                    chip.textContent = label.name;
+                    chip.title = active ? 'クリックでこのラベルから外す' : 'クリックでこのラベルに追加';
+                    chip.style.background = active ? (label.color || '#fff') : '#fff';
+                    chip.style.borderColor = active ? 'rgba(0,0,0,0.25)' : '#ccc';
+                    chip.addEventListener('click', () => toggleLabelForPin(label.id, pin));
+                    box.appendChild(chip);
+                });
+            });
+        }
+
+        function startDraftLabelSelection() {
+            labelSelectionDraftMode = true;
+            labelSelectionMode = true;
+            labelPaintActive = false;
+            draftLabelPins = [];
+            document.removeEventListener('pointerup', handleValveLabelSelectPointerUp);
+            renderTable(backupTableData());
+        }
+
+        function addLabel() {
+            if (!labelSelectionDraftMode || draftLabelPins.length === 0) {
+                alert('先にラベルに入れたいバルブ行をドラッグでなぞって選択してください。');
+                return;
+            }
+
+            const defaultName = `ラベル${valveLabels.length + 1}`;
+            const inputName = prompt('ラベル名を入力してください。', defaultName);
+            if (inputName === null) return;
+
+            const name = inputName.trim() || defaultName;
+            const label = {
+                id: nextLabelId++,
+                name,
+                pins: [...draftLabelPins].sort((a, b) => VALVE_PINS.indexOf(a) - VALVE_PINS.indexOf(b)),
+                color: LABEL_COLORS[(nextLabelId - 2) % LABEL_COLORS.length]
+            };
+            valveLabels.push(label);
+            selectedLabelId = label.id;
+            labelSelectionDraftMode = false;
+            labelSelectionMode = false;
+            labelPaintActive = false;
+            draftLabelPins = [];
+            renderTable(backupTableData());
+        }
+
+        function beginLabelSelection(labelId) {
+            selectedLabelId = labelId;
+            const label = getSelectedLabel();
+            if (!label) return;
+            labelSelectionMode = true;
+            labelPaintActive = false;
+            labelSelectionOriginalPins = [...(label.pins || [])];
+            renderTable(backupTableData());
+        }
+
+        function stopLabelSelection(keepSelection = true) {
+            const label = getSelectedLabel();
+            if (labelSelectionDraftMode) {
+                if (!keepSelection) draftLabelPins = [];
+                labelSelectionDraftMode = false;
+            } else if (!keepSelection && label && Array.isArray(labelSelectionOriginalPins)) {
+                label.pins = [...labelSelectionOriginalPins];
+            }
+            labelSelectionMode = false;
+            labelPaintActive = false;
+            labelSelectionOriginalPins = null;
+            document.removeEventListener('pointerup', handleValveLabelSelectPointerUp);
+            renderTable(backupTableData());
+        }
+
+        function addPinToSelectedLabel(pin) {
+            pin = Number(pin);
+            if (!VALVE_PINS.includes(pin)) return;
+
+            if (labelSelectionDraftMode) {
+                if (!draftLabelPins.includes(pin)) {
+                    draftLabelPins.push(pin);
+                    draftLabelPins.sort((a, b) => VALVE_PINS.indexOf(a) - VALVE_PINS.indexOf(b));
+                }
+            } else {
+                const label = getSelectedLabel();
+                if (!label) return;
+                if (!label.pins.includes(pin)) {
+                    label.pins.push(pin);
+                    label.pins.sort((a, b) => VALVE_PINS.indexOf(a) - VALVE_PINS.indexOf(b));
+                }
+            }
+
+            renderLabelControls();
+            renderRowLabelChips();
+            const row = document.querySelector(`.valve-row[data-pin="${pin}"]`);
+            if (row) row.classList.add('label-select-picked');
+        }
+
+        function removePinFromSelectedLabel(pin) {
+            pin = Number(pin);
+            if (!VALVE_PINS.includes(pin)) return;
+
+            if (labelSelectionDraftMode) {
+                draftLabelPins = draftLabelPins.filter(p => Number(p) !== pin);
+                if (draftLabelPins.length === 0) {
+                    // 選択が空になっても、次のドラッグ選択を続けられるようにドラフト状態は維持する
+                    labelSelectionMode = true;
+                }
+            } else {
+                const label = getSelectedLabel();
+                if (!label) return;
+                label.pins = (label.pins || []).filter(p => Number(p) !== pin);
+            }
+
+            renderLabelControls();
+            renderRowLabelChips();
+            const row = document.querySelector(`.valve-row[data-pin="${pin}"]`);
+            if (row) row.classList.remove('label-select-picked');
+        }
+
+        function isPinSelectedForCurrentDraft(pin) {
+            pin = Number(pin);
+            if (labelSelectionDraftMode) return draftLabelPins.includes(pin);
+            const label = getSelectedLabel();
+            return !!(label && Array.isArray(label.pins) && label.pins.includes(pin));
+        }
+
+        function paintPinForCurrentLabel(pin) {
+            if (labelSelectionPaintAction === 'remove') {
+                removePinFromSelectedLabel(pin);
+            } else {
+                addPinToSelectedLabel(pin);
+            }
+        }
+
+        function handleValveLabelSelectPointerDown(event) {
+            // ラベル作成用の選択は「選択」ボタンからだけ開始する。
+            // 「≡」でPin並べ替え中・直後は絶対に選択処理を起動しない。
+            if (event.button !== undefined && event.button !== 0) return;
+            if (isLabelSelectionSuppressed()) return;
+            if (event.target.closest('.drag-handle')) return;
+            if (!event.currentTarget || !event.currentTarget.classList || !event.currentTarget.classList.contains('select-handle')) return;
+
+            const row = event.currentTarget.closest('.valve-row');
+            if (!row) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (!labelSelectionDraftMode) {
+                labelSelectionDraftMode = true;
+                labelSelectionMode = true;
+                draftLabelPins = [];
+                labelSelectionOriginalPins = null;
+            }
+
+            const pin = Number(row.dataset.pin);
+            labelPaintActive = true;
+            row.classList.add('label-select-mode-row', 'label-select-active-row');
+            labelSelectionStartPin = pin;
+            labelSelectionStartWasSelected = isPinSelectedForCurrentDraft(pin);
+            labelSelectionPaintAction = labelSelectionStartWasSelected ? 'remove' : 'add';
+            labelSelectionDragMoved = false;
+            labelSelectionPointerStartX = event.clientX;
+            labelSelectionPointerStartY = event.clientY;
+
+            // 未選択から始めた場合は追加モード。選択済みから始めた場合は解除モード。
+            // 選択済みの場合は、クリックだけならpointerupで解除、ドラッグなら移動開始時に解除する。
+            if (!labelSelectionStartWasSelected) {
+                addPinToSelectedLabel(pin);
+            } else {
+                row.classList.add('label-select-picked');
+                renderLabelControls();
+            }
+
+            document.addEventListener('pointermove', handleValveLabelSelectPointerMove);
+            document.addEventListener('pointerup', handleValveLabelSelectPointerUp, { once: true });
+        }
+
+        function handleValveLabelSelectPointerMove(event) {
+            if (!labelPaintActive || valveReorderActive) return;
+
+            const dx = event.clientX - labelSelectionPointerStartX;
+            const dy = event.clientY - labelSelectionPointerStartY;
+            if (Math.hypot(dx, dy) > 6) {
+                labelSelectionDragMoved = true;
+                // 選択済みからドラッグ開始した場合、動き始めた時点で開始Pinも解除する
+                if (labelSelectionPaintAction === 'remove' && labelSelectionStartPin !== null) {
+                    removePinFromSelectedLabel(labelSelectionStartPin);
+                }
+            }
+
+            // pointerenterに頼らず、現在のマウス位置にあるバルブ行を直接取得する
+            const element = document.elementFromPoint(event.clientX, event.clientY);
+            const row = element ? element.closest('.valve-row') : null;
+            if (!row) return;
+
+            const pin = Number(row.dataset.pin);
+            if (!Number.isFinite(pin)) return;
+            row.classList.add('label-select-mode-row', 'label-select-active-row');
+            if (pin !== labelSelectionStartPin) labelSelectionDragMoved = true;
+            paintPinForCurrentLabel(pin);
+        }
+
+        function handleValveLabelSelectPointerEnter(event) {
+            // 旧方式との互換用。現在はpointermove + elementFromPointで判定する。
+            if (!labelPaintActive) return;
+            const pin = Number(event.currentTarget.dataset.pin);
+            if (pin !== labelSelectionStartPin) labelSelectionDragMoved = true;
+            paintPinForCurrentLabel(pin);
+        }
+
+        function handleValveLabelSelectPointerUp() {
+            document.removeEventListener('pointermove', handleValveLabelSelectPointerMove);
+
+            // 選択済みだった行を、ドラッグせずもう一回クリックした場合だけ解除
+            if (labelSelectionStartWasSelected && !labelSelectionDragMoved && labelSelectionStartPin !== null) {
+                removePinFromSelectedLabel(labelSelectionStartPin);
+            }
+
+            clearLabelDragVisualState();
+            renderLabelControls();
+        }
+
+        function deleteSelectedLabel() {
+            if (selectedLabelId === null || selectedLabelId === undefined) return;
+            deleteLabelById(selectedLabelId, true);
+        }
+
+        function renameSelectedLabel() {
+            const label = getSelectedLabel();
+            if (!label) return;
+            const name = document.getElementById('selectedLabelName').value.trim();
+            label.name = name || '名称未設定ラベル';
+            renderLabelControls();
+            renderRowLabelChips();
+        }
+
+        function toggleLabelForPin(labelId, pin) {
+            const label = valveLabels.find(l => String(l.id) === String(labelId));
+            if (!label) return;
+            pin = Number(pin);
+            if (label.pins.includes(pin)) {
+                label.pins = label.pins.filter(p => p !== pin);
+            } else {
+                label.pins.push(pin);
+                label.pins.sort((a, b) => VALVE_PINS.indexOf(a) - VALVE_PINS.indexOf(b));
+            }
+            renderLabelControls();
+            renderRowLabelChips();
+        }
+
+        function getStepRange() {
+            return setStepRange(document.getElementById('labelStepStart').value || 1, document.getElementById('labelStepEnd').value || currentSteps);
+        }
+
+        function applyLabel(action) {
+            const label = getSelectedLabel();
+            if (!label) return;
+            if (label.pins.length === 0) {
+                alert('選択中のラベルにバルブが登録されていません。');
+                return;
+            }
+
+            // ステップ範囲は「画面上の左から何番目か」で指定する。
+            const { start, end } = getStepRange();
+            const stepKeys = getActiveStepKeys().slice(start - 1, end);
+            label.pins.forEach(pin => {
+                stepKeys.forEach(stepKey => {
+                    const cb = document.getElementById(`pin${pin}_s${stepKey}`);
+                    if (!cb) return;
+                    if (action === 'on') cb.checked = true;
+                    if (action === 'off') cb.checked = false;
+                    if (action === 'toggle') cb.checked = !cb.checked;
+                });
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // --- ラベル削除用ドラッグ 安定版 ---
+        // HTML5のdrag/dropはブラウザやタッチパッド環境でdropが発火しないことがあるため、
+        // pointerイベントだけで「つかむ→動かす→ゴミ箱上で離す」を判定する。
+        let labelDragGhost = null;
+
+        function setTrashActive(active) {
+            const trash = document.getElementById('labelTrashZone');
+            if (trash) trash.classList.toggle('drag-over', Boolean(active));
+        }
+
+        function createLabelDragGhost(chip, x, y) {
+            removeLabelDragGhost();
+            labelDragGhost = chip.cloneNode(true);
+            labelDragGhost.classList.add('label-drag-ghost');
+            labelDragGhost.style.left = `${x}px`;
+            labelDragGhost.style.top = `${y}px`;
+            document.body.appendChild(labelDragGhost);
+        }
+
+        function moveLabelDragGhost(x, y) {
+            if (!labelDragGhost) return;
+            labelDragGhost.style.left = `${x}px`;
+            labelDragGhost.style.top = `${y}px`;
+        }
+
+        function removeLabelDragGhost() {
+            if (labelDragGhost && labelDragGhost.parentNode) {
+                labelDragGhost.parentNode.removeChild(labelDragGhost);
+            }
+            labelDragGhost = null;
+        }
+
+        function handleLabelPointerDown(event, labelId, chip) {
+            // ×ボタンはクリック削除に任せる
+            if (event.target.classList && event.target.classList.contains('label-delete-mini')) return;
+            if (event.button !== undefined && event.button !== 0) return;
+
+            event.preventDefault();
+            suppressNextLabelClick = false;
+
+            labelPointerDrag = {
+                active: true,
+                labelId,
+                chip,
+                startX: event.clientX,
+                startY: event.clientY,
+                moved: false,
+                pointerId: event.pointerId
+            };
+
+            try {
+                chip.setPointerCapture(event.pointerId);
+            } catch (e) {}
+
+            document.addEventListener('pointermove', handleLabelPointerMove, { passive: false });
+            document.addEventListener('pointerup', handleLabelPointerUp, { once: true, passive: false });
+            document.addEventListener('pointercancel', handleLabelPointerCancel, { once: true, passive: false });
+        }
+
+        function handleLabelPointerMove(event) {
+            if (!labelPointerDrag.active) return;
+            event.preventDefault();
+
+            const dx = event.clientX - labelPointerDrag.startX;
+            const dy = event.clientY - labelPointerDrag.startY;
+
+            if (!labelPointerDrag.moved && Math.hypot(dx, dy) > 4) {
+                labelPointerDrag.moved = true;
+                draggedLabelId = labelPointerDrag.labelId;
+                suppressNextLabelClick = true;
+                if (labelPointerDrag.chip) {
+                    labelPointerDrag.chip.classList.add('dragging');
+                    createLabelDragGhost(labelPointerDrag.chip, event.clientX, event.clientY);
+                }
+            }
+
+            if (labelPointerDrag.moved) {
+                moveLabelDragGhost(event.clientX, event.clientY);
+                const inside = isPointerInsideTrash(event);
+                setTrashActive(inside);
+                if (labelPointerDrag.chip) {
+                    labelPointerDrag.chip.classList.toggle('delete-ready', inside);
+                }
+            }
+        }
+
+        function handleLabelPointerUp(event) {
+            document.removeEventListener('pointermove', handleLabelPointerMove);
+            document.removeEventListener('pointercancel', handleLabelPointerCancel);
+
+            const wasMoved = labelPointerDrag.active && labelPointerDrag.moved;
+            const labelId = labelPointerDrag.labelId;
+            const chip = labelPointerDrag.chip;
+            const shouldDelete = wasMoved && isPointerInsideTrash(event);
+
+            if (chip) {
+                chip.classList.remove('dragging');
+                chip.classList.remove('delete-ready');
+                try { chip.releasePointerCapture(labelPointerDrag.pointerId); } catch (e) {}
+            }
+
+            setTrashActive(false);
+            removeLabelDragGhost();
+            labelPointerDrag = { active: false, labelId: null, chip: null, startX: 0, startY: 0, moved: false };
+            draggedLabelId = null;
+
+            if (shouldDelete) {
+                suppressNextLabelClick = true;
+                setTimeout(() => deleteLabelById(labelId, true), 0);
+            }
+
+            setTimeout(() => {
+                suppressNextLabelClick = false;
+            }, 250);
+        }
+
+        function handleLabelPointerCancel() {
+            document.removeEventListener('pointermove', handleLabelPointerMove);
+            setTrashActive(false);
+            removeLabelDragGhost();
+            if (labelPointerDrag.chip) {
+                labelPointerDrag.chip.classList.remove('dragging');
+                labelPointerDrag.chip.classList.remove('delete-ready');
+            }
+            labelPointerDrag = { active: false, labelId: null, chip: null, startX: 0, startY: 0, moved: false };
+            draggedLabelId = null;
+            suppressNextLabelClick = false;
+        }
+
+        // 削除ボタンも確実に同じ削除処理へ通す。
+        function deleteSelectedLabel() {
+            if (selectedLabelId === null || selectedLabelId === undefined) return;
+            deleteLabelById(selectedLabelId, true);
+        }
+
+        // --- +/- ボタンのイベントリスナー ---
+        document.getElementById('btnValvePlus').addEventListener('click', () => {
+            if (currentValves < MAX_VALVES) {
+                currentValves++;
+                renderTable();
+            } else {
+                alert('バルブは18個までしか追加できません。');
+            }
+        });
+
+        document.getElementById('btnValveMinus').addEventListener('click', () => {
+            if (currentValves > MIN_VALVES) {
+                currentValves--;
+                renderTable();
+            }
+        });
+
+        document.getElementById('btnStepPlus').addEventListener('click', () => {
+            if (currentSteps < MAX_STEPS) {
+                currentSteps++;
+                setStepRange(document.getElementById('labelStepStart').value || 1, currentSteps);
+                renderTable();
+            } else {
+                alert('ステップは20個までしか追加できません。');
+            }
+        });
+
+        document.getElementById('btnStepMinus').addEventListener('click', () => {
+            if (currentSteps > MIN_STEPS) {
+                currentSteps--;
+                renderTable();
+            }
+        });
+
+
+
+        // --- ラベル削除 修正版（×ボタンだけで削除） ---
+        function setupLabelTrashZone() {
+            const trash = document.getElementById('labelTrashZone');
+            if (trash) trash.style.display = 'none';
+        }
+
+        function deleteLabelById(labelId, requireConfirm = true) {
+            const targetId = String(labelId);
+            const label = valveLabels.find(l => String(l.id) === targetId);
+            if (!label) return;
+            if (requireConfirm && !confirm(`「${label.name}」を削除しますか？`)) return;
+            if (String(selectedLabelId) === targetId) {
+                labelSelectionMode = false;
+                labelPaintActive = false;
+                labelSelectionOriginalPins = null;
+                labelSelectionDraftMode = false;
+                draftLabelPins = [];
+            }
+            valveLabels = valveLabels.filter(l => String(l.id) !== targetId);
+            selectedLabelId = valveLabels.length > 0 ? valveLabels[0].id : null;
+            renderLabelControls();
+            renderRowLabelChips();
+        }
+
+        function deleteSelectedLabel() {
+            if (selectedLabelId === null || selectedLabelId === undefined || selectedLabelId === '') return;
+            deleteLabelById(selectedLabelId, true);
+        }
+
+
+        function updateInlineLabelAddButtons() {
+            const canAdd = !!(labelSelectionDraftMode && draftLabelPins.length > 0);
+            document.querySelectorAll('.inline-add-label-btn').forEach(btn => {
+                const pin = Number(btn.dataset.pin);
+                const isSelected = draftLabelPins.includes(pin);
+                btn.disabled = !canAdd;
+                btn.textContent = canAdd ? `ラベル追加(${draftLabelPins.length})` : 'ラベル追加';
+                btn.style.display = canAdd && isSelected ? 'inline-block' : 'none';
+            });
+        }
+
+        function renderLabelControls() {
+            const labelSelect = document.getElementById('labelSelect');
+            const selectedLabelName = document.getElementById('selectedLabelName');
+            const labelChipWrap = document.getElementById('labelChipWrap');
+            const finishBtn = document.getElementById('finishLabelSelectionBtn');
+            const cancelBtn = document.getElementById('cancelLabelSelectionBtn');
+            const status = document.getElementById('labelSelectionStatus');
+            const addBtn = document.getElementById('addLabelBtn');
+            const startBtn = document.getElementById('startLabelSelectionBtn');
+            const trash = document.getElementById('labelTrashZone');
+            const labelPanel = document.getElementById('labelPanel');
+            const hasLabels = valveLabels.length > 0;
+            if (labelPanel) labelPanel.style.display = hasLabels ? '' : 'none';
+            if (trash) trash.style.display = 'none';
+
+            labelSelect.innerHTML = '';
+            labelChipWrap.innerHTML = '';
+
+            valveLabels.forEach(label => {
+                const option = document.createElement('option');
+                option.value = label.id;
+                option.textContent = `${label.name} (${label.pins.length})`;
+                if (String(label.id) === String(selectedLabelId)) option.selected = true;
+                labelSelect.appendChild(option);
+
+                const chip = document.createElement('span');
+                chip.className = 'label-chip';
+                chip.dataset.labelId = label.id;
+                chip.title = 'クリックで選択 / ×で削除';
+                chip.draggable = false;
+                if (String(label.id) === String(selectedLabelId)) chip.classList.add('selected');
+                chip.style.background = label.color || '#fff';
+
+                const dot = document.createElement('span');
+                dot.className = 'label-dot';
+                dot.style.background = label.color || '#fff';
+                chip.appendChild(dot);
+
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = label.name;
+                chip.appendChild(nameSpan);
+
+                const count = document.createElement('small');
+                count.textContent = ` ${label.pins.length}`;
+                chip.appendChild(count);
+
+                const del = document.createElement('button');
+                del.type = 'button';
+                del.className = 'label-delete-mini';
+                del.title = 'このラベルを削除';
+                del.textContent = '×';
+                del.addEventListener('pointerdown', (event) => event.stopPropagation());
+                del.addEventListener('mousedown', (event) => event.stopPropagation());
+                del.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    deleteLabelById(label.id, true);
+                });
+                chip.appendChild(del);
+
+                chip.addEventListener('click', () => {
+                    selectedLabelId = label.id;
+                    renderLabelControls();
+                    renderRowLabelChips();
+                });
+                labelChipWrap.appendChild(chip);
+            });
+
+            const label = getSelectedLabel();
+            selectedLabelName.value = label ? label.name : '';
+            selectedLabelName.disabled = !label;
+            labelSelect.disabled = valveLabels.length === 0;
+            document.getElementById('renameLabelBtn').disabled = !label;
+            document.getElementById('deleteLabelBtn').disabled = !label;
+            document.getElementById('applyLabelOnBtn').disabled = !label;
+            document.getElementById('applyLabelOffBtn').disabled = !label;
+            document.getElementById('applyLabelToggleBtn').disabled = !label;
+            if (finishBtn) finishBtn.style.display = 'none';
+            if (cancelBtn) cancelBtn.style.display = labelSelectionMode ? 'inline-block' : 'none';
+            if (startBtn) startBtn.style.display = 'none';
+            if (addBtn) {
+                addBtn.disabled = !(labelSelectionDraftMode && draftLabelPins.length > 0);
+                addBtn.style.display = 'none';
+                addBtn.textContent = labelSelectionDraftMode
+                    ? `ラベル追加（${draftLabelPins.length}個選択中）`
+                    : 'ラベル追加';
+            }
+            updateInlineLabelAddButtons();
+            if (status) {
+                status.classList.toggle('active', labelSelectionMode);
+                if (labelSelectionDraftMode) {
+                    status.textContent = `ラベル作成用の選択中：現在 ${draftLabelPins.length} 個選択中です。続けてバルブ行をドラッグでなぞれます。選択後に、選択したPinのカスタム名右側に出る「ラベル追加」を押すと名前を入力できます。`;
+                } else if (labelSelectionMode && label) {
+                    status.textContent = `ラベル選択モード中：「${label.name}」に入れたいバルブ行をドラッグでなぞってください。現在 ${label.pins.length} 個選択中です。`;
+                } else {
+                    status.textContent = '使い方：各バルブ行の「選択」ボタンを押したまま上下になぞって選択 → 選択したPinのカスタム名右側に出る「ラベル追加」 → ラベル名を入力。';
+                }
+            }
+        }
+
+        // --- ラベル操作イベント ---
+        const startLabelSelectionBtn = document.getElementById('startLabelSelectionBtn');
+        if (startLabelSelectionBtn) startLabelSelectionBtn.addEventListener('click', startDraftLabelSelection);
+        document.getElementById('addLabelBtn').addEventListener('click', addLabel);
+        document.getElementById('finishLabelSelectionBtn').addEventListener('click', () => stopLabelSelection(true));
+        document.getElementById('cancelLabelSelectionBtn').addEventListener('click', () => stopLabelSelection(false));
+        document.getElementById('renameLabelBtn').addEventListener('click', renameSelectedLabel);
+        document.getElementById('deleteLabelBtn').addEventListener('click', deleteSelectedLabel);
+        setupLabelTrashZone();
+        document.getElementById('labelSelect').addEventListener('change', (event) => {
+            selectedLabelId = event.target.value;
+            renderLabelControls();
+            renderRowLabelChips();
+        });
+        document.getElementById('selectedLabelName').addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                renameSelectedLabel();
+                event.target.blur();
+            }
+        });
+        document.getElementById('applyLabelOnBtn').addEventListener('click', () => applyLabel('on'));
+        document.getElementById('applyLabelOffBtn').addEventListener('click', () => applyLabel('off'));
+        document.getElementById('applyLabelToggleBtn').addEventListener('click', () => applyLabel('toggle'));
+
+        document.addEventListener('input', (event) => {
+            if (event.target.classList && event.target.classList.contains('custom-name-input')) {
+                renderLabelControls();
+            }
+        });
+
+        // 初期化
+        initStepRangeEditor();
+        renderTable({ checkbox: {}, number: {}, text: {} });
+
+        // --- リセット処理：ステップ数・Pin数・ラベル・カスタム名・範囲スライダーは残して初期化 ---
+        function resetExceptCountsAndLabels() {
+            if (!confirm('ステップ数・Pin数・作成済みラベル・Pinのカスタム名・ステップ範囲スライダー以外をリセットしますか？')) return;
+
+            const keptLabels = valveLabels.map(label => ({
+                ...label,
+                pins: Array.isArray(label.pins) ? [...label.pins] : []
+            }));
+            const keptSelectedLabelId = selectedLabelId;
+            const keptNextLabelId = nextLabelId;
+
+            // Pinのカスタム名を維持
+            const keptCustomNames = {};
+            getActivePins().forEach(pin => {
+                const nameInput = document.getElementById(`name_pin${pin}`);
+                if (nameInput) keptCustomNames[`name_pin${pin}`] = nameInput.value;
+            });
+
+            // ステップ範囲スライダーを維持
+            const keptRangeStart = parseInt(document.getElementById('labelStepStart').value) || 1;
+            const keptRangeEnd = parseInt(document.getElementById('labelStepEnd').value) || currentSteps;
+
+            // ドラッグ選択や並べ替え中の一時状態を解除
+            cancelActiveLabelPaint();
+            labelSelectionMode = false;
+            labelPaintActive = false;
+            labelSelectionOriginalPins = null;
+            labelSelectionDraftMode = false;
+            draftLabelPins = [];
+            labelSelectionStartPin = null;
+            labelSelectionStartWasSelected = false;
+            labelSelectionDragMoved = false;
+            draggedPin = null;
+            draggedStepKey = null;
+            draggedLabelId = null;
+            valveReorderActive = false;
+
+            // 数・ラベル・カスタム名・範囲スライダーは維持し、それ以外を初期化
+            valveLabels = keptLabels;
+            selectedLabelId = keptLabels.some(label => String(label.id) === String(keptSelectedLabelId))
+                ? keptSelectedLabelId
+                : (keptLabels.length > 0 ? keptLabels[0].id : null);
+            nextLabelId = keptNextLabelId || (keptLabels.length ? Math.max(...keptLabels.map(label => Number(label.id) || 0)) + 1 : 1);
+
+            valveOrder = [...VALVE_PINS];
+            stepOrder = Array.from({ length: MAX_STEPS }, (_, i) => i + 1);
+            normalizeStepOrder();
+
+            document.getElementById('loopCount').value = 1;
+
+            // checkbox/numberは空バックアップで初期化、textだけ保持してカスタム名を残す
+            renderTable({ checkbox: {}, number: {}, text: keptCustomNames });
+            setStepRange(keptRangeStart, keptRangeEnd);
+        }
+
+        // --- 設定ファイル保存処理 ---
+        function saveConfig() {
+            const config = {
+                version: 5,
+                savedAt: new Date().toISOString(),
+                valvePins: VALVE_PINS,
+                valveOrder: valveOrder,
+                stepOrder: stepOrder,
+                currentValves: currentValves,
+                currentSteps: currentSteps,
+                loopCount: parseInt(document.getElementById('loopCount').value) || 1,
+                valveNames: [],
+                labels: valveLabels,
+                selectedLabelId: selectedLabelId,
+                nextLabelId: nextLabelId,
+                labelStepStart: parseInt(document.getElementById('labelStepStart').value) || 1,
+                labelStepEnd: parseInt(document.getElementById('labelStepEnd').value) || currentSteps,
+                steps: []
+            };
+
+            getActivePins().forEach(pin => {
+                const nameInput = document.getElementById(`name_pin${pin}`);
+                config.valveNames.push({
+                    pin,
+                    bitIndex: pinToBitIndex(pin),
+                    name: nameInput ? nameInput.value : ''
+                });
+            });
+
+            getActiveStepKeys().forEach((stepKey, displayIndex) => {
+                const stepData = {
+                    step: stepKey,
+                    displayIndex: displayIndex + 1,
+                    enabled: document.getElementById(`enable_s${stepKey}`).checked,
+                    timeMs: parseInt(document.getElementById(`time_s${stepKey}`).value) || 0,
+                    valves: []
+                };
+
+                getActivePins().forEach(pin => {
+                    const cb = document.getElementById(`pin${pin}_s${stepKey}`);
+                    stepData.valves.push({
+                        pin,
+                        bitIndex: pinToBitIndex(pin),
+                        checked: cb ? cb.checked : false
+                    });
+                });
+
+                config.steps.push(stepData);
+            });
+
+            const jsonText = JSON.stringify(config, null, 2);
+            const blob = new Blob([jsonText], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+
+            const now = new Date();
+            const fileName = `valve_config_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}.json`;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
+            URL.revokeObjectURL(url);
+        }
+
+        // --- 設定ファイル読み込み処理 ---
+        function loadConfigFromFile(file) {
+            const reader = new FileReader();
+
+            reader.onload = function(event) {
+                try {
+                    const config = JSON.parse(event.target.result);
+                    if (!config || !Array.isArray(config.steps)) {
+                        alert('設定ファイルの形式が正しくありません。');
+                        return;
+                    }
+
+                    currentValves = Math.min(Math.max(config.currentValves || 18, MIN_VALVES), MAX_VALVES);
+                    currentSteps = Math.min(Math.max(config.currentSteps || 10, MIN_STEPS), MAX_STEPS);
+                    document.getElementById('loopCount').value = config.loopCount || 1;
+                    setStepRange(config.labelStepStart || 1, config.labelStepEnd || currentSteps);
+
+                    if (Array.isArray(config.valveOrder) && config.valveOrder.length === VALVE_PINS.length) {
+                        const validOrder = config.valveOrder.map(Number).filter(pin => VALVE_PINS.includes(pin));
+                        const missing = VALVE_PINS.filter(pin => !validOrder.includes(pin));
+                        valveOrder = [...validOrder, ...missing];
+                    } else {
+                        valveOrder = [...VALVE_PINS];
+                    }
+
+                    if (Array.isArray(config.stepOrder) && config.stepOrder.length === MAX_STEPS) {
+                        stepOrder = config.stepOrder;
+                        normalizeStepOrder();
+                    } else {
+                        stepOrder = Array.from({ length: MAX_STEPS }, (_, i) => i + 1);
+                    }
+
+                    // version 3/4: labels / version 2: groups を変換
+                    if (Array.isArray(config.labels)) {
+                        valveLabels = config.labels.map((label, i) => ({
+                            id: label.id,
+                            name: label.name || '名称未設定ラベル',
+                            pins: Array.isArray(label.pins) ? label.pins.map(Number) : [],
+                            color: label.color || LABEL_COLORS[i % LABEL_COLORS.length]
+                        }));
+                        nextLabelId = config.nextLabelId || (valveLabels.length ? (Math.max(...valveLabels.map(l => Number(l.id) || 0)) + 1) : 1);
+                        selectedLabelId = valveLabels.length ? (config.selectedLabelId || valveLabels[0].id) : null;
+                    } else if (Array.isArray(config.groups) && config.groups.length > 0) {
+                        valveLabels = config.groups.map((group, i) => ({
+                            id: group.id,
+                            name: group.name || '名称未設定ラベル',
+                            pins: Array.isArray(group.valveIndexes)
+                                ? group.valveIndexes.map(index => VALVE_PINS[Number(index) - 1]).filter(Boolean)
+                                : [],
+                            color: LABEL_COLORS[i % LABEL_COLORS.length]
+                        }));
+                        nextLabelId = config.nextGroupId || (Math.max(...valveLabels.map(l => Number(l.id) || 0)) + 1);
+                        selectedLabelId = config.selectedGroupId || valveLabels[0].id;
+                    } else {
+                        valveLabels = [];
+                        selectedLabelId = null;
+                        nextLabelId = 1;
+                    }
+
+                    renderTable({ checkbox: {}, number: {}, text: {} });
+                    setStepRange(config.labelStepStart || 1, config.labelStepEnd || currentSteps);
+
+                    // バルブ名を復元。version 1/2のindex形式にも対応。
+                    if (Array.isArray(config.valveNames)) {
+                        config.valveNames.forEach(valve => {
+                            const pin = valve.pin || VALVE_PINS[Number(valve.index) - 1];
+                            const nameInput = document.getElementById(`name_pin${pin}`);
+                            if (nameInput) nameInput.value = valve.name || '';
+                        });
+                    }
+
+                    // ステップ情報を復元。version 1/2のindex形式にも対応。
+                    config.steps.forEach(stepData => {
+                        const s = stepData.step;
+
+                        const enableCb = document.getElementById(`enable_s${s}`);
+                        if (enableCb) enableCb.checked = Boolean(stepData.enabled);
+
+                        const timeInput = document.getElementById(`time_s${s}`);
+                        if (timeInput) timeInput.value = stepData.timeMs || 0;
+
+                        if (Array.isArray(stepData.valves)) {
+                            stepData.valves.forEach(valve => {
+                                const pin = valve.pin || VALVE_PINS[Number(valve.index) - 1];
+                                const cb = document.getElementById(`pin${pin}_s${s}`);
+                                if (cb) cb.checked = Boolean(valve.checked);
+                            });
+                        }
+                    });
+
+                    sanitizeLabels();
+                    renderLabelControls();
+                    renderRowLabelChips();
+                    alert('設定ファイルを読み込みました。');
+
+                } catch (error) {
+                    console.error(error);
+                    alert('設定ファイルの読み込みに失敗しました。');
+                }
+            };
+
+            reader.readAsText(file);
+        }
+
+        document.getElementById('saveConfigBtn').addEventListener('click', () => saveConfig());
+        document.getElementById('loadConfigBtn').addEventListener('click', () => document.getElementById('configFileInput').click());
+        document.getElementById('resetConfigBtn').addEventListener('click', () => resetExceptCountsAndLabels());
+        document.getElementById('configFileInput').addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) loadConfigFromFile(file);
+            event.target.value = '';
+        });
+
+        // --- Bluetooth通信処理 ---
+        const SERVICE_UUID = '12345678-1234-5678-1234-56789abcdef0';
+        const CHARACTERISTIC_UUID = '12345678-1234-5678-1234-56789abcdef1';
+
+        let bluetoothDevice;
+        let commandCharacteristic;
+
+        const connectBtn = document.getElementById('connectBtn');
+        const sendBtn = document.getElementById('sendBtn');
+        const statusDiv = document.getElementById('status');
+
+        connectBtn.addEventListener('click', async () => {
+            try {
+                statusDiv.innerText = 'ステータス: 接続中...';
+                statusDiv.style.color = '#333';
+
+                bluetoothDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'ESP32_Valve_Control' }],
+                    optionalServices: [SERVICE_UUID]
+                });
+
+                bluetoothDevice.addEventListener('gattserverdisconnected', () => {
+                    statusDiv.innerText = 'ステータス: 切断されました';
+                    statusDiv.style.color = 'red';
+                    sendBtn.disabled = true;
+                    commandCharacteristic = null;
+                });
+
+                const server = await bluetoothDevice.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                commandCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+
+                statusDiv.innerText = 'ステータス: 接続完了';
+                statusDiv.style.color = '#28a745';
+                sendBtn.disabled = false;
+            } catch (error) {
+                console.error(error);
+                statusDiv.innerText = 'ステータス: 接続失敗 (' + error.message + ')';
+                statusDiv.style.color = 'red';
+            }
+        });
+
+        // --- データ送信処理 ---
+        sendBtn.addEventListener('click', async () => {
+            if (!commandCharacteristic) return;
+
+            const loopCount = parseInt(document.getElementById('loopCount').value) || 1;
+            const safeLoopCount = Math.min(Math.max(loopCount, 1), 999);
+            const payloadArray = [safeLoopCount];
+
+            getActiveStepKeys().forEach(stepKey => {
+                const isEnabled = document.getElementById(`enable_s${stepKey}`).checked;
+                if (!isEnabled) return;
+
+                const timeMs = parseInt(document.getElementById(`time_s${stepKey}`).value) || 0;
+                let valveState = 0;
+
+                getActivePins().forEach(pin => {
+                    const cb = document.getElementById(`pin${pin}_s${stepKey}`);
+                    const bitIndex = pinToBitIndex(pin);
+                    if (cb && cb.checked && bitIndex >= 0) {
+                        valveState |= (1 << bitIndex);
+                    }
+                });
+
+                payloadArray.push(timeMs);
+                payloadArray.push(valveState);
+            });
+
+            if (payloadArray.length <= 1) {
+                alert('有効なステップがありません。');
+                return;
+            }
+
+            const sequenceData = new Uint32Array(payloadArray);
+
+            try {
+                await commandCharacteristic.writeValue(sequenceData);
+                statusDiv.innerText = 'ステータス: 送信完了 (' + new Date().toLocaleTimeString() + ')';
+                statusDiv.style.color = '#28a745';
+            } catch (error) {
+                console.error(error);
+                statusDiv.innerText = 'ステータス: 送信エラー (' + error.message + ')';
+                statusDiv.style.color = 'red';
+            }
+        });
+    </script>
+</body>
+</html>
